@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-br" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>Previsão do Tempo</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background: linear-gradient(135deg, #1e293b, #334155);
+      min-height: 100vh;
+      margin: 0;
+      padding: 2rem;
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+    }
+
+    /* ESTILOS DE HOVER RESTAURADOS AQUI */
+    .weather-container {
+      max-width: 420px;
+      width: 100%;
+      background: linear-gradient(145deg, rgba(56,189,248,0.25), rgba(129,140,248,0.3));
+      backdrop-filter: blur(20px);
+      border-radius: 1.5rem;
+      padding: 2rem;
+      box-shadow: 0 0 25px rgba(0, 255, 255, 0.15);
+      border: 1px solid rgba(0, 255, 255, 0.3);
+      transition: all 0.3s ease; /* Adicionado para suavizar o hover */
+    }
+
+    .weather-container:hover {
+      box-shadow: 0 0 35px rgba(0, 255, 255, 0.35);
+      border-color: rgba(0, 255, 255, 0.6);
+    }
+
+    .search-box {
+      display: flex;
+      margin-bottom: 2rem;
+    }
+
+    .search-box input {
+      flex: 1;
+      padding: 0.7rem 1.2rem;
+      border: none;
+      border-radius: 2rem 0 0 2rem;
+      outline: none;
+      background: rgba(255,255,255,0.9);
+      color: #111;
+    }
+
+    .search-box button {
+      background: #0ea5e9;
+      border: none;
+      border-radius: 0 2rem 2rem 0;
+      padding: 0 1.2rem;
+      color: white;
+      font-size: 1.2rem;
+    }
+    
+    .today-weather {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .today-weather .weather-icon {
+      width: 100px;
+      height: 100px;
+      margin: 0 auto 0.5rem;
+    }
+
+    .today-weather .temp {
+      font-size: 3.5rem;
+      font-weight: bold;
+      line-height: 1;
+    }
+
+    .today-weather .city {
+      font-size: 1.5rem;
+      font-weight: 500;
+      margin-bottom: 1.5rem;
+    }
+    
+    .today-weather .details-row {
+        display: flex;
+        justify-content: space-around;
+        text-align: center;
+        font-size: 0.9rem;
+    }
+    
+    .today-weather .details-row .label {
+        font-weight: 600;
+        opacity: 0.8;
+    }
+
+    .forecast-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      padding-bottom: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .forecast-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    /* ESTILOS DE HOVER RESTAURADOS AQUI */
+    .forecast-item {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 0.75rem;
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      transition: transform 0.2s, background-color 0.2s; /* Adicionado para suavizar o hover */
+    }
+    
+    .forecast-item:hover {
+      transform: scale(1.03);
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .forecast-item img {
+      width: 45px;
+      height: 45px;
+    }
+    
+    .forecast-item .day {
+        font-weight: 600;
+    }
+
+    .erro {
+      color: #f87171;
+      font-weight: bold;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<div class="weather-container">
+  <form action="/buscar-clima" method="post" class="search-box">
+    <input type="text" name="cidade" placeholder="Digite a cidade" required>
+    <button type="submit">🔍</button>
+  </form>
+
+  <div th:if="${erro}">
+    <p class="erro" th:text="${erro}"></p>
+  </div>
+
+  <div th:if="${previsaoHoje}">
+    
+    <div class="today-weather">
+        <img class="weather-icon" 
+             th:src="@{/images/{imagem}(imagem=${T(br.com.clima.clima_app.ClimaUtil).getNomeImagem(previsaoHoje.tempo)})}" 
+             alt="Ícone do tempo">
+        <div class="temp" th:text="${previsaoHoje.maxima} + '°C'"></div>
+        <div class="city" th:text="${cidadeInfo.nome + ', ' + cidadeInfo.uf}"></div>
+        <div class="details-row">
+            <div>
+                <div class="label">Mínima</div>
+                <div th:text="${previsaoHoje.minima} + '°C'"></div>
+            </div>
+            <div>
+                <div class="label">Condição</div>
+                <div th:text="${previsaoHoje.tempo}"></div>
+            </div>
+        </div>
+    </div>
+
+    <div th:if="${!proximosDias.isEmpty()}">
+        <div class="forecast-title">Próximos Dias</div>
+        <div class="forecast-list">
+          <div th:each="p : ${proximosDias}" class="forecast-item">
+            <div class="d-flex align-items-center gap-3">
+                <img th:src="@{/images/{imagem}(imagem=${T(br.com.clima.clima_app.ClimaUtil).getNomeImagem(p.tempo)})}" alt="Ícone">
+                <div class="day" th:text="${#temporals.format(p.dia, 'eeee')}"></div>
+            </div>
+            <div class="temps" th:text="${p.maxima} + '°C / ' + ${p.minima} + '°C'"></div>
+          </div>
+        </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
