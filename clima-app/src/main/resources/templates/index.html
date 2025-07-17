@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-br" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>Previsão do Tempo</title>
+  <style>
+    body{background:linear-gradient(135deg,#1e293b,#334155);min-height:100vh;margin:0;padding:2rem;font-family:'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;color:white}
+    .weather-container{max-width:420px;width:100%;background:linear-gradient(145deg,rgba(56,189,248,.25),rgba(129,140,248,.3));backdrop-filter:blur(20px);border-radius:1.5rem;padding:2rem;box-shadow:0 0 25px rgba(0,255,255,.15);border:1px solid rgba(0,255,255,.3);transition:all .3s ease}
+    .weather-container:hover{box-shadow:0 0 35px rgba(0,255,255,.35);border-color:rgba(0,255,255,.6)}
+    .search-container{position:relative} 
+    .search-box{display:flex;margin-bottom:0} 
+    .search-box input{flex:1;padding:.7rem 1.2rem;border:none;border-radius:2rem 0 0 2rem;outline:none;background:rgba(255,255,255,.9);color:#111}
+    .search-box button{background:#0ea5e9;border:none;border-radius:0 2rem 2rem 0;padding:0 1.2rem;color:white;font-size:1.2rem}
+    #suggestions{position:absolute;top:100%;left:0;right:0;background:rgba(30,41,59,.9);backdrop-filter:blur(10px);border:1px solid rgba(0,255,255,.3);border-radius:0 0 1rem 1rem;z-index:1000;max-height:250px;overflow-y:auto;margin-top:-1rem;padding-top:1rem;display:none} /* Estilo para sugestões */
+    .suggestion-item{padding:.7rem 1.5rem;cursor:pointer;transition:background-color .2s}
+    .suggestion-item:hover{background-color:rgba(0,255,255,.15)}
+    .today-weather{text-align:center;margin:2rem 0}.today-weather .weather-icon{width:100px;height:100px;margin:0 auto .5rem}.today-weather .temp{font-size:3.5rem;font-weight:700;line-height:1}.today-weather .city{font-size:1.5rem;font-weight:500;margin-bottom:1.5rem}.today-weather .details-row{display:flex;justify-content:space-around;text-align:center;font-size:.9rem}.today-weather .details-row .label{font-weight:600;opacity:.8}
+    .forecast-title{font-size:1.1rem;font-weight:600;border-bottom:1px solid rgba(255,255,255,.2);padding-bottom:.5rem;margin-bottom:1rem}
+    .forecast-list{display:flex;flex-direction:column;gap:.75rem}
+    .forecast-item{background:rgba(255,255,255,.08);border-radius:.75rem;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;transition:transform .2s,background-color .2s}
+    .forecast-item:hover{transform:scale(1.03);background:rgba(255,255,255,.15)}
+    .forecast-item img{width:45px;height:45px}.forecast-item .day{font-weight:600}
+    .erro{color:#f87171;font-weight:700;text-align:center}
+  </style>
+</head>
+<body>
+
+<div class="weather-container">
+  <div class="search-container">
+    <form id="climaForm" action="/buscar-clima" method="post">
+      <div class="search-box">
+        <input type="text" id="cidadeInput" name="cidadeNome" autocomplete="off" th:value="${cidadePesquisada}" placeholder="Digite a cidade" required>
+        <button type="submit">🔍</button>
+      </div>
+      <input type="hidden" id="cidadeIdInput" name="cidadeId">
+    </form>
+    <div id="suggestions"></div>
+  </div>
+
+  <div th:if="${erro}">
+    <p class="erro" th:text="${erro}"></p>
+  </div>
+
+  <div th:if="${previsaoHoje}">
+    <div class="today-weather">
+        <img class="weather-icon" th:src="@{/images/{imagem}(imagem=${T(br.com.clima.clima_app.ClimaUtil).getNomeImagem(previsaoHoje.tempo)})}" alt="Ícone do tempo">
+        <div class="temp" th:text="${previsaoHoje.maxima} + '°C'"></div>
+        <div class="city" th:text="${cidadeInfo.nome + ', ' + cidadeInfo.uf}"></div>
+        <div class="details-row">
+            <div><div class="label">Mínima</div><div th:text="${previsaoHoje.minima} + '°C'"></div></div>
+            <div><div class="label">Condição</div><div th:text="${previsaoHoje.tempo}"></div></div>
+        </div>
+    </div>
+    <div th:if="${!proximosDias.isEmpty()}">
+        <div class="forecast-title">Próximos Dias</div>
+        <div class="forecast-list">
+          <div th:each="p : ${proximosDias}" class="forecast-item">
+            <div class="d-flex align-items-center gap-3"><img th:src="@{/images/{imagem}(imagem=${T(br.com.clima.clima_app.ClimaUtil).getNomeImagem(p.tempo)})}" alt="Ícone"><div class="day" th:text="${#temporals.format(p.dia, 'eeee')}"></div></div>
+            <div class="temps" th:text="${p.maxima} + '°C / ' + ${p.minima} + '°C'"></div>
+          </div>
+        </div>
+    </div>
+  </div>
+</div>
+
+<script>
+    const cidadeInput = document.getElementById('cidadeInput');
+    const suggestionsDiv = document.getElementById('suggestions');
+    const cidadeIdInput = document.getElementById('cidadeIdInput');
+    const climaForm = document.getElementById('climaForm');
+    let debounceTimer;
+
+    cidadeInput.addEventListener('keyup', (e) => {
+        clearTimeout(debounceTimer);
+        const termo = e.target.value;
+
+        if (termo.length < 3) {
+            suggestionsDiv.style.display = 'none';
+            return;
+        }
+
+        debounceTimer = setTimeout(() => {
+            fetch(`/api/cidades?termo=${termo}`)
+                .then(response => response.json())
+                .then(data => {
+                    suggestionsDiv.innerHTML = '';
+                    if (data.length > 0) {
+                        data.forEach(cidade => {
+                            const item = document.createElement('div');
+                            item.className = 'suggestion-item';
+                            item.textContent = `${cidade.nome}, ${cidade.uf}`;
+                            item.addEventListener('click', () => {
+                                cidadeInput.value = `${cidade.nome}, ${cidade.uf}`;
+                                cidadeIdInput.value = cidade.id;
+                                suggestionsDiv.style.display = 'none';
+                                climaForm.submit();
+                            });
+                            suggestionsDiv.appendChild(item);
+                        });
+                        suggestionsDiv.style.display = 'block';
+                    } else {
+                        suggestionsDiv.style.display = 'none';
+                    }
+                });
+        }, 300);
+    });
+
+    
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.search-container')) {
+            suggestionsDiv.style.display = 'none';
+        }
+    });
+</script>
+
+</body>
+</html>
